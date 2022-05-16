@@ -4,18 +4,18 @@ trigger: none
 # Runtime Identifier (RID) unter https://docs.microsoft.com/en-us/dotnet/core/rid-catalog
 strategy:
   matrix:
-    # win_x64:
-    #   imageName: 'windows-2022'
-    #   runtime: 'win10-x64'
+    win_x64:
+      imageName: 'windows-2022'
+      runtime: 'win10-x64'
     linux_x64:
       imageName: 'ubuntu-latest'
       runtime: 'linux-x64'
-    # macOS_x64:
-    #   imageName: 'macOS-latest'
-    #   runtime: 'osx-x64'
-    # macOS_arm64:
-    #   imageName: 'macOS-latest'
-    #   runtime: 'osx.11.0-arm64'
+    macOS_x64:
+      imageName: 'macOS-latest'
+      runtime: 'osx-x64'
+    macOS_arm64:
+      imageName: 'macOS-latest'
+      runtime: 'osx.11.0-arm64'
 
 pool:
   vmImage: $(imageName)
