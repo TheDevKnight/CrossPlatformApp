@@ -40,9 +40,9 @@ steps:
   displayName: 'Install .NET 6.0 SDK on macOS_x64' 
   condition: eq(variables['runtime'], 'osx-x64')
 
-# - bash: curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel LTS --architecture arm64
-#   displayName: 'Install .NET 6.0 SDK on macOS_arm64' 
-#   condition: eq(variables['runtime'], 'osx.11.0-arm64')
+- bash: curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel LTS --architecture arm64
+  displayName: 'Install .NET 6.0 SDK on macOS_arm64' 
+  condition: eq(variables['runtime'], 'osx.11.0-arm64')
 
 - task: NuGetToolInstaller@1
   displayName: 'Install NuGet Tools'
