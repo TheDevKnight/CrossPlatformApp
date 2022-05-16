@@ -1,0 +1,100 @@
+trigger: none
+
+# VM Images unter https://docs.microsoft.com/en-us/azure/devops/pipelines/agents/hosted?view=azure-devops&tabs=yaml#software
+# Runtime Identifier (RID) unter https://docs.microsoft.com/en-us/dotnet/core/rid-catalog
+strategy:
+  matrix:
+    # win_x64:
+    #   imageName: 'windows-2022'
+    #   runtime: 'win10-x64'
+    linux_x64:
+      imageName: 'ubuntu-latest'
+      runtime: 'linux-x64'
+    # macOS_x64:
+    #   imageName: 'macOS-latest'
+    #   runtime: 'osx-x64'
+    # macOS_arm64:
+    #   imageName: 'macOS-latest'
+    #   runtime: 'osx.11.0-arm64'
+
+pool:
+  vmImage: $(imageName)
+
+variables:
+  solution: '**/CrossPlatformApp.sln'
+  buildConfiguration: 'Release'
+
+steps:
+
+- checkout: self
+  lfs: true
+
+# Die folgenden Schritte ersetzen UseDotNet@2 und bieten mehr Möglichkeiten (z.B. Architektur) die Installation zu parametrisieren
+# Sie sind nur notwendig, wenn das SDK noch nicht in der passenden Konfiguration (Version, Architektur) auf dem VM Image vorinstalliert ist.
+
+# - pwsh: "&([scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://dot.net/v1/dotnet-install.ps1'))) -Channel LTS -Architecture x64"
+#   displayName: 'Install .NET 6.0 SDK on win10-x64'
+#   condition: eq(variables['runtime'], 'win10-x64')
+
+- bash: curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel LTS --architecture x64
+  displayName: 'Install .NET 6.0 SDK on macOS_x64' 
+  condition: eq(variables['runtime'], 'osx-x64')
+
+# - bash: curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel LTS --architecture arm64
+#   displayName: 'Install .NET 6.0 SDK on macOS_arm64' 
+#   condition: eq(variables['runtime'], 'osx.11.0-arm64')
+
+- task: NuGetToolInstaller@1
+  displayName: 'Install NuGet Tools'
+
+- task: NuGetCommand@2
+  displayName: 'Restore Solution'
+  inputs:
+    restoreSolution: '$(solution)'
+
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'build'
+    projects: '$(solution)'
+    arguments: '--configuration $(buildConfiguration) --no-restore'
+  displayName: 'Build Solution'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Test'
+  inputs:
+    command: test
+    projects: '**/CrossPlatformApp.Test.csproj'
+    arguments: '--configuration $(buildConfiguration) --collect "XPlat Code Coverage" --runtime $(runtime)'
+
+- task: PowerShell@2
+  displayName: 'Create coverage reports'
+  inputs:
+    targetType: 'inline'
+    script: |
+      dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.0.4
+      
+      # Für möglichen Parameter siehe https://danielpalme.github.io/ReportGenerator/usage.html
+      # Der Reporttype Cobertura ist das Format welches automatisch von Azure DevOps gerendert wird
+      reportgenerator `
+      "-reports:$(Agent.TempDirectory)/**/coverage.cobertura.xml" `
+      "-targetdir:$(Build.SourcesDirectory)/coverlet/reports" `
+      -reporttypes:"Cobertura"
+      
+- task: PublishCodeCoverageResults@1
+  displayName: 'Publish coverage reports'
+  inputs:
+    codeCoverageTool: 'cobertura'
+    summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/Cobertura.xml'
+
+- task: PowerShell@2
+  displayName: 'Check coverage rate'
+  inputs:
+    targetType: 'inline'
+    script: |
+      $xml = [xml](Get-Content "$(System.DefaultWorkingDirectory)/coverlet/reports/Cobertura.xml")
+        $lineRateText = ($xml.coverage.attributes | Where-Object Name -eq "line-rate").Value
+        $lineRate = [math]::Round($lineRateText -as [double], 4) * 100
+        [double]$limit = 10.00
+        if ($lineRate -lt $limit) {
+          throw "Die minimale Codeabdeckung von $limit% wurde mit $lineRate% nicht erreicht!"
+        }
