@@ -94,7 +94,7 @@ steps:
       $xml = [xml](Get-Content "$(System.DefaultWorkingDirectory)/coverlet/reports/Cobertura.xml")
         $lineRateText = ($xml.coverage.attributes | Where-Object Name -eq "line-rate").Value
         $lineRate = [math]::Round($lineRateText -as [double], 4) * 100
-        [double]$limit = 95.00
+        [double]$limit = 10.00
         if ($lineRate -lt $limit) {
           throw "Die minimale Codeabdeckung von $limit% wurde mit $lineRate% nicht erreicht!"
         }
